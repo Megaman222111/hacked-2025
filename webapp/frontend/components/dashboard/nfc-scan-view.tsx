@@ -2,9 +2,9 @@
 
 import { useState, useCallback, useEffect, useRef } from "react"
 import { Nfc } from "lucide-react"
-import { patients } from "@/lib/mock-data"
-import type { Patient } from "@/lib/mock-data"
+import type { Patient } from "@/lib/api"
 import { PatientOverlay } from "@/components/dashboard/patient-overlay"
+import { scanNfcTag } from "@/lib/api"
 
 // Ambient concentric rings config
 const AMBIENT_RINGS = [
@@ -17,19 +17,29 @@ const AMBIENT_RINGS = [
 export function NfcScanView() {
   const [scannedPatient, setScannedPatient] = useState<Patient | null>(null)
   const [isScanning, setIsScanning] = useState(false)
+  const [scanError, setScanError] = useState<string | null>(null)
   const [ripples, setRipples] = useState<number[]>([])
   const rippleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const handleScan = useCallback(() => {
+  const handleScan = useCallback(async () => {
     if (isScanning || scannedPatient) return
+
+    setScanError(null)
     setIsScanning(true)
 
-    setTimeout(() => {
-      const randomPatient =
-        patients[Math.floor(Math.random() * patients.length)]
-      setScannedPatient(randomPatient)
+    try {
+      const patient = await scanNfcTag()
+      await new Promise((resolve) => setTimeout(resolve, 800))
+
+      if (!patient) {
+        setScanError("Scan failed. Confirm the Django backend is running and reachable.")
+        return
+      }
+
+      setScannedPatient(patient)
+    } finally {
       setIsScanning(false)
-    }, 1500)
+    }
   }, [isScanning, scannedPatient])
 
   const handleClose = useCallback(() => {
@@ -168,6 +178,10 @@ export function NfcScanView() {
         Hold the patient&apos;s NFC wristband near this device to retrieve
         their medical records securely.
       </p>
+
+      {scanError && (
+        <p className="mt-3 text-center text-sm text-destructive">{scanError}</p>
+      )}
 
       {/* Patient data overlay */}
       {scannedPatient && (

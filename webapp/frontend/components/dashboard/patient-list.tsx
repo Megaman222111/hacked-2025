@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import {
   Search,
   ChevronRight,
@@ -13,7 +13,8 @@ import {
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { patients } from "@/lib/mock-data"
+import type { Patient } from "@/lib/api"
+import { getPatients } from "@/lib/api"
 
 function getStatusColor(status: string) {
   switch (status) {
@@ -33,8 +34,40 @@ function getInitials(first: string, last: string) {
 }
 
 export function PatientList() {
+  const [patients, setPatients] = useState<Patient[]>([])
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+
+    async function loadPatients() {
+      setLoading(true)
+      setError(null)
+
+      try {
+        const data = await getPatients()
+        if (active) {
+          setPatients(data)
+        }
+      } catch {
+        if (active) {
+          setError("Could not load patients from the backend API.")
+        }
+      } finally {
+        if (active) {
+          setLoading(false)
+        }
+      }
+    }
+
+    loadPatients()
+    return () => {
+      active = false
+    }
+  }, [])
 
   const filteredPatients = useMemo(() => {
     return patients.filter((p) => {
@@ -45,7 +78,7 @@ export function PatientList() {
       const matchesStatus = statusFilter === "all" || p.status === statusFilter
       return matchesSearch && matchesStatus
     })
-  }, [search, statusFilter])
+  }, [patients, search, statusFilter])
 
   const activeCount = patients.filter((p) => p.status === "active").length
   const criticalCount = patients.filter((p) => p.status === "critical").length
@@ -137,6 +170,18 @@ export function PatientList() {
 
       {/* Patient list */}
       <div className="flex flex-col gap-3">
+        {loading && (
+          <div className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground">
+            Loading patients...
+          </div>
+        )}
+
+        {error && (
+          <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-5 text-sm text-destructive">
+            {error}
+          </div>
+        )}
+
         {filteredPatients.map((patient) => (
           <Link
             key={patient.id}
@@ -174,7 +219,7 @@ export function PatientList() {
           </Link>
         ))}
 
-        {filteredPatients.length === 0 && (
+        {!loading && !error && filteredPatients.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border py-16">
             <Users className="mb-3 h-10 w-10 text-muted-foreground/40" />
             <p className="text-sm font-medium text-muted-foreground">No patients found</p>

@@ -18,7 +18,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
-import type { Patient } from "@/lib/mock-data"
+import type { Patient } from "@/lib/api"
 
 function getStatusColor(status: string) {
   switch (status) {

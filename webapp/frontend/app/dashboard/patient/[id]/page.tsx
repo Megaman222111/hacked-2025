@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation"
 import { DashboardShell } from "@/components/dashboard/dashboard-shell"
 import { PatientDetail } from "@/components/dashboard/patient-detail"
-import { patients } from "@/lib/mock-data"
+import { getPatientById } from "@/lib/api"
 
 export default async function PatientPage({
   params,
@@ -9,7 +9,7 @@ export default async function PatientPage({
   params: Promise<{ id: string }>
 }) {
   const { id } = await params
-  const patient = patients.find((p) => p.id === id)
+  const patient = await getPatientById(id)
 
   if (!patient) {
     notFound()
