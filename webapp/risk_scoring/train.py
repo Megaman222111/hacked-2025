@@ -25,6 +25,8 @@ class TrainingResult:
     metrics: Dict[str, float]
 
 
+# Convert bracketed age buckets from CSV (e.g., [40-50)) into midpoint years.
+# Provides a stable numeric age feature even when source uses categorical ranges.
 def _age_bracket_to_years(age_str: str) -> float:
     """Map UCI-style age brackets like '[40-50)' to midpoint years."""
     if not age_str or not isinstance(age_str, str):
@@ -36,6 +38,8 @@ def _age_bracket_to_years(age_str: str) -> float:
     return float((lo + hi) // 2)
 
 
+# Load training CSV and map each row into shared feature schema + binary label.
+# Label policy: readmitted == "<30" is positive (1), otherwise negative (0).
 def _build_training_rows_from_csv(
     csv_path: Path,
     *,
@@ -89,6 +93,8 @@ def _build_training_rows_from_csv(
     return rows, labels
 
 
+# Fit preprocessing + logistic model, validate batch predict_proba behavior, and save.
+# Also computes optional validation metrics and metadata for runtime scoring.
 def _fit_and_save_pipeline(X, labels: List[int], model_dir: Path, model_version: str) -> TrainingResult:
     try:
         import joblib
@@ -116,6 +122,7 @@ def _fit_and_save_pipeline(X, labels: List[int], model_dir: Path, model_version:
         missing = [col for col in FEATURE_COLUMN_ORDER if col not in X.columns]
         raise ValueError(f"Missing required feature columns: {missing}")
 
+    # Build the same preprocessing stack used for both training and evaluation.
     def _build_pipeline() -> Pipeline:
         preprocess = ColumnTransformer(
             transformers=[
@@ -208,6 +215,8 @@ def _fit_and_save_pipeline(X, labels: List[int], model_dir: Path, model_version:
     )
 
 
+# Public training entrypoint used by management command.
+# Resolves default paths, enforces minimum data/positives, then saves versioned artifact.
 def train_and_save(
     min_rows: int = 25,
     min_positives: int = 5,

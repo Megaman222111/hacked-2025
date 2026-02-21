@@ -27,10 +27,13 @@ class RiskPrediction:
 
 
 class RiskScoringService:
+    # Resolve artifact path relative to Django BASE_DIR and track latest load error.
     def __init__(self):
         self.model_dir = Path(settings.BASE_DIR) / "risk_scoring" / "artifacts"
         self._last_load_error: str | None = None
 
+    # Map probability to low/medium/high with payload thresholds when available.
+    # Applies safe defaults and guards against invalid threshold ordering.
     @staticmethod
     def _to_band(prob: float, thresholds: Dict[str, Any] | None = None) -> str:
         medium = 0.15
@@ -53,9 +56,12 @@ class RiskScoringService:
             return "medium"
         return "low"
 
+    # Wrapper for deterministic fallback scoring to keep predict() flow simple.
     def _heuristic_score(self, feature_row: Dict[str, Any]) -> float:
         return heuristic_risk_score(feature_row)
 
+    # Main runtime entrypoint: build features, run supervised model, fallback if needed.
+    # Returns API-ready prediction payload fields via RiskPrediction.
     def predict(self, patient: Any) -> RiskPrediction:
         feature_row = patient_to_feature_dict(patient)
         model_payload = self._load_latest_model_payload()
@@ -100,6 +106,7 @@ class RiskScoringService:
             scoring_mode="supervised",
         )
 
+    # Convert transformed feature names (e.g. num__/cat__) to human-friendly labels.
     @staticmethod
     def _humanize_feature_name(name: str) -> str:
         if name.startswith("num__"):
@@ -112,6 +119,8 @@ class RiskScoringService:
             return raw
         return name
 
+    # Compute per-patient top contributions as transformed_value * coefficient.
+    # Falls back to stored top weights for older artifact formats.
     def _top_model_factors(self, model_payload: Dict[str, Any], X):
         factors: List[Dict[str, Any]] = []
         try:
@@ -160,6 +169,8 @@ class RiskScoringService:
             )
         return factors
 
+    # Load newest readable risk_model_*.joblib payload; skip unreadable artifacts.
+    # Stores last failure message for diagnostics without crashing requests.
     def _load_latest_model_payload(self) -> Dict[str, Any] | None:
         if not self.model_dir.exists():
             return None

@@ -16,6 +16,7 @@ FEATURE_CATEGORICAL_COLUMNS = ["gender"]
 FEATURE_COLUMN_ORDER: List[str] = FEATURE_NUMERIC_COLUMNS + FEATURE_CATEGORICAL_COLUMNS
 
 
+# Parse ISO-like date/datetime strings into a date; return None on empty/invalid.
 def _safe_date(value: str) -> date | None:
     if not value:
         return None
@@ -34,6 +35,8 @@ def _safe_date(value: str) -> date | None:
     return None
 
 
+# Normalize patient fields that may be scalar/list/dict into a clean list[str].
+# This keeps downstream count features stable regardless of source shape.
 def _as_list(value: Any) -> list[str]:
     if not value:
         return []
@@ -48,6 +51,8 @@ def _as_list(value: Any) -> list[str]:
     return [str(value).strip()] if str(value).strip() else []
 
 
+# Build one model-ready feature row from a patient object.
+# Computes bounded age/length-of-stay features, count features, and normalized categories.
 def patient_to_feature_dict(patient: Any, *, now_date: date | None = None) -> Dict[str, Any]:
     today = now_date or date.today()
 
@@ -76,7 +81,8 @@ def patient_to_feature_dict(patient: Any, *, now_date: date | None = None) -> Di
         "status": status,
     }
 
-
+# Compute a bounded fallback probability using transparent additive rules.
+# Used when no trained model is available or model prediction fails.
 def heuristic_risk_score(feature_row: Dict[str, Any]) -> float:
     """Same rule-based score used when no trained model is available (0–1)."""
     score = 0.08
@@ -95,6 +101,8 @@ def heuristic_risk_score(feature_row: Dict[str, Any]) -> float:
     return max(0.01, min(0.95, score))
 
 
+# Return up to 5 rule contributions explaining the heuristic score.
+# Keeps explainability payload shape similar to supervised scoring mode.
 def top_heuristic_factors(feature_row: Dict[str, Any], score: float) -> list[Dict[str, Any]]:
     factors: list[Dict[str, Any]] = []
     if feature_row["status"] == "critical":
@@ -115,6 +123,8 @@ def top_heuristic_factors(feature_row: Dict[str, Any], score: float) -> list[Dic
     return factors[:5]
 
 
+# Convert feature dict rows into a DataFrame expected by the sklearn pipeline.
+# Enforces column order and normalizes numeric/categorical dtypes.
 def feature_dicts_to_dataframe(rows: List[Dict[str, Any]]):
     """Convert list of feature dicts to a DataFrame with columns in pipeline order."""
     import pandas as pd
