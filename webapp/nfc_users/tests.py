@@ -1,11 +1,8 @@
 import json
-from datetime import datetime
 
 from django.test import Client, TestCase
-from django.utils import timezone
 
-from nfc_users.models import Patient, PatientOutcomeEvent
-from risk_scoring.train import _build_training_rows
+from nfc_users.models import Patient
 
 
 def _create_patient(
@@ -40,44 +37,6 @@ def _create_patient(
     p.notes = []
     p.save()
     return p
-
-
-class RiskTrainingLabelTests(TestCase):
-    def test_build_training_rows_uses_admission_window(self):
-        p_positive = _create_patient(
-            patient_id="A-POS",
-            nfc_id="A-POS",
-            admission_date="2026-01-01",
-        )
-        p_negative = _create_patient(
-            patient_id="B-NEG",
-            nfc_id="B-NEG",
-            admission_date="2026-01-01",
-        )
-        _create_patient(
-            patient_id="C-PENDING",
-            nfc_id="C-PENDING",
-            admission_date="2026-03-01",
-        )
-
-        PatientOutcomeEvent.objects.create(
-            patient=p_positive,
-            event_type=PatientOutcomeEvent.EventType.CRITICAL_DETERIORATION,
-            event_time=timezone.make_aware(datetime(2026, 1, 20, 12, 0, 0)),
-            source="test",
-        )
-        PatientOutcomeEvent.objects.create(
-            patient=p_negative,
-            event_type=PatientOutcomeEvent.EventType.CRITICAL_DETERIORATION,
-            event_time=timezone.make_aware(datetime(2026, 2, 25, 12, 0, 0)),
-            source="test",
-        )
-
-        now = timezone.make_aware(datetime(2026, 3, 10, 0, 0, 0))
-        rows, labels = _build_training_rows(now=now)
-
-        self.assertEqual(len(rows), 2)
-        self.assertEqual(labels, [1, 0])
 
 
 class RiskApiFlowTests(TestCase):

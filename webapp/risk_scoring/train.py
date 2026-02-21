@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 import re
-from typing import Any, Dict, List, Tuple
+from typing import Dict, List, Tuple
 
 from django.conf import settings
 
@@ -25,81 +25,6 @@ class TrainingResult:
     metrics: Dict[str, float]
 
 
-def _safe_date(value: str) -> date | None:
-    if not value:
-        return None
-    raw = value.strip()
-    if not raw:
-        return None
-    try:
-        return date.fromisoformat(raw)
-    except ValueError:
-        pass
-    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
-        try:
-            return datetime.strptime(raw, fmt).date()
-        except ValueError:
-            continue
-    return None
-
-
-def _build_training_rows(now=None) -> Tuple[List[Dict[str, Any]], List[int]]:
-    """
-    Legacy helper for DB-derived labels. `train_and_save()` now trains from CSV.
-
-    Build labeled rows from observed outcomes in each patient's first 30 days since admission.
-    Positive label: deterioration/death event within [admission_date, admission_date + 30 days].
-    Negative label: no such event and at least 30 days have elapsed since admission.
-    """
-    from django.utils import timezone
-    from nfc_users.models import Patient, PatientOutcomeEvent
-
-    from .features import patient_to_feature_dict
-
-    now = now or timezone.now()
-    now_date = now.date()
-    rows: List[Dict[str, Any]] = []
-    labels: List[int] = []
-
-    outcomes = PatientOutcomeEvent.objects.filter(
-        event_type__in=[
-            PatientOutcomeEvent.EventType.CRITICAL_DETERIORATION,
-            PatientOutcomeEvent.EventType.DEATH,
-        ]
-    )
-    by_patient: Dict[str, List[PatientOutcomeEvent]] = {}
-    for event in outcomes:
-        by_patient.setdefault(event.patient_id, []).append(event)
-
-    for patient in Patient.objects.all():
-        admission_date = _safe_date(getattr(patient, "admission_date", "") or "")
-        if not admission_date:
-            continue
-
-        events = by_patient.get(patient.id, [])
-        horizon_end = admission_date + timedelta(days=30)
-        positive_event_dates = sorted(
-            e.event_time.date()
-            for e in events
-            if admission_date <= e.event_time.date() <= horizon_end
-        )
-        positive = bool(positive_event_dates)
-        negative_observed = (not positive) and (now_date >= horizon_end)
-
-        if not (positive or negative_observed):
-            # Skip unresolved examples where the 30-day window has not elapsed.
-            continue
-
-        # Build each feature row at a clinically meaningful point in time:
-        # - positives: first observed deterioration/death in the 30-day window
-        # - negatives: end of 30-day window
-        snapshot_date = positive_event_dates[0] if positive else horizon_end
-        rows.append(patient_to_feature_dict(patient, now_date=snapshot_date))
-        labels.append(1 if positive else 0)
-
-    return rows, labels
-
-
 def _age_bracket_to_years(age_str: str) -> float:
     """Map UCI-style age brackets like '[40-50)' to midpoint years."""
     if not age_str or not isinstance(age_str, str):
@@ -116,7 +41,7 @@ def _build_training_rows_from_csv(
     *,
     max_rows: int | None = 50_000,
     random_state: int = 42,
-) -> Tuple[List[Dict[str, Any]], List[int]]:
+) -> Tuple[List[Dict[str, object]], List[int]]:
     try:
         import pandas as pd
     except ImportError as exc:
@@ -133,7 +58,7 @@ def _build_training_rows_from_csv(
     if max_rows and max_rows > 0 and len(df) > max_rows:
         df = df.sample(n=max_rows, random_state=random_state).reset_index(drop=True)
 
-    rows: List[Dict[str, Any]] = []
+    rows: List[Dict[str, object]] = []
     labels: List[int] = []
 
     for _, r in df.iterrows():
@@ -165,8 +90,6 @@ def _build_training_rows_from_csv(
 
 
 def _fit_and_save_pipeline(X, labels: List[int], model_dir: Path, model_version: str) -> TrainingResult:
-    import time
-
     try:
         import joblib
         import numpy as np
@@ -244,8 +167,6 @@ def _fit_and_save_pipeline(X, labels: List[int], model_dir: Path, model_version:
     medium_threshold = max(0.08, min(0.20, base_rate))
     high_threshold = max(medium_threshold + 0.05, min(0.35, base_rate * 2.0))
 
-    if not model_version:
-        model_version = f"risk-v1-{int(time.time())}"
     model_dir = Path(model_dir)
     model_dir.mkdir(parents=True, exist_ok=True)
     path = model_dir / f"risk_model_{model_version}.joblib"
