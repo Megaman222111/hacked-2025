@@ -32,12 +32,6 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", "*"]
 
-# Ark Labs API for patient AI overview (OpenAI-compatible chat completions)
-ARK_LABS_API_URL = os.environ.get("ARK_LABS_API_URL", "https://api.ark-labs.cloud/api/v1/chat/completions").strip()
-_raw_key = os.environ.get("ARK_LABS_API_KEY", "").strip().replace("\r", "").replace("\n", "")
-ARK_LABS_API_KEY = _raw_key.strip("'\"").strip() if _raw_key else ""
-ARK_LABS_MODEL = os.environ.get("ARK_LABS_MODEL", "gpt-4o").strip()
-
 # Application definition
 
 INSTALLED_APPS = [

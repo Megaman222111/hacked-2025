@@ -17,23 +17,7 @@ export const metadata: Metadata = {
   title: 'TriageID NFC - Secure Patient Identification',
   description:
     'NFC-based patient identification system for instant verification in emergencies. Secure, encrypted wristbands for healthcare professionals.',
-  icons: {
-    icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
-      {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
-      },
-    ],
-    apple: '/apple-icon.png',
-  },
+  // Icons: add icon.svg, icon.png, or apple-icon.png to public/ if you want custom favicons
 }
 
 export const viewport: Viewport = {

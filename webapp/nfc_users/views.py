@@ -2,13 +2,6 @@
 REST API for NFC user lookup, create, and Patient API for React frontend.
 """
 import json
-import logging
-import subprocess
-import urllib.error
-import urllib.request
-from django.conf import settings
-
-logger = logging.getLogger(__name__)
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST, require_http_methods
@@ -254,35 +247,12 @@ def nfc_scan(request):
         )
 
 
-def _patient_text_summary(api_dict):
-    """Build a plain-text summary of patient data for the AI overview prompt."""
-    parts = []
-    parts.append(f"Patient: {api_dict.get('firstName', '')} {api_dict.get('lastName', '')} (ID: {api_dict.get('id', '')})")
-    parts.append(f"Status: {api_dict.get('status', '')}; Room: {api_dict.get('room', '')}; Admission: {api_dict.get('admissionDate', '')}")
-    parts.append(f"DOB: {api_dict.get('dateOfBirth', '')}; Gender: {api_dict.get('gender', '')}; Blood type: {api_dict.get('bloodType', '')}")
-    if api_dict.get("primaryDiagnosis"):
-        parts.append(f"Primary diagnosis: {api_dict['primaryDiagnosis']}")
-    if api_dict.get("allergies"):
-        parts.append(f"Allergies: {', '.join(api_dict['allergies'])}")
-    if api_dict.get("medications"):
-        meds = [f"{m.get('name', '')} ({m.get('dosage', '')})" for m in api_dict["medications"]]
-        parts.append(f"Medications: {'; '.join(meds)}")
-    ec = api_dict.get("emergencyContact") or {}
-    if ec.get("name"):
-        parts.append(f"Emergency contact: {ec.get('name')} ({ec.get('relationship')}) {ec.get('phone', '')}")
-    if api_dict.get("medicalHistory"):
-        parts.append(f"Medical history: {', '.join(api_dict['medicalHistory'])}")
-    if api_dict.get("notes"):
-        parts.append(f"Notes: {'; '.join(api_dict['notes'])}")
-    return "\n".join(parts)
-
-
 @csrf_exempt
 @require_POST
 def patient_ai_overview(request):
     """
-    POST /api/patients/ai-overview/ – Get an AI-generated clinical overview for a patient.
-    Body: JSON with patient_id. Uses Ark Labs API (chat completions).
+    POST /api/patients/ai-overview/
+    Body: JSON with patient_id. Returns blank overview.
     """
     try:
         body = json.loads(request.body) if request.body else {}
@@ -294,88 +264,8 @@ def patient_ai_overview(request):
         return JsonResponse({"detail": "patient_id is required."}, status=400)
 
     try:
-        p = Patient.objects.get(pk=patient_id)
+        Patient.objects.get(pk=patient_id)
     except Patient.DoesNotExist:
-        return JsonResponse(
-            {"detail": f"Patient '{patient_id}' not found."},
-            status=404,
-        )
+        return JsonResponse({"detail": f"Patient '{patient_id}' not found."}, status=404)
 
-    api_url = getattr(settings, "ARK_LABS_API_URL", "").strip() or "https://api.ark-labs.cloud/api/v1/chat/completions"
-    api_key = getattr(settings, "ARK_LABS_API_KEY", "").strip()
-    model = getattr(settings, "ARK_LABS_MODEL", "gpt-4o").strip() or "gpt-4o"
-    summary = _patient_text_summary(p.to_api_dict())
-    prompt = (
-        "You are a clinical assistant. Based on the following patient record, provide a brief, "
-        "clear clinical overview in 2–4 sentences. Highlight key risks (e.g. allergies), current "
-        "diagnosis, and the most relevant care points. Use plain language.\n\nPatient record:\n"
-    ) + summary
-
-    payload = {
-        "model": model,
-        "messages": [{"role": "user", "content": prompt}],
-        "temperature": 0.7,
-    }
-    body_json = json.dumps(payload)
-
-    content = ""
-    error_detail = None
-    try:
-        if not api_key:
-            error_detail = "ARK_LABS_API_KEY is not set. Add it to webapp/.env"
-        else:
-            # Use curl so the request matches the working command exactly
-            proc = subprocess.run(
-                [
-                    "curl",
-                    "-s",
-                    "-X",
-                    "POST",
-                    api_url,
-                    "-H",
-                    "Content-Type: application/json",
-                    "-H",
-                    f"Authorization: Bearer {api_key}",
-                    "-d",
-                    body_json,
-                ],
-                capture_output=True,
-                text=True,
-                timeout=90,
-            )
-            out = (proc.stdout or "").strip()
-            err = (proc.stderr or "").strip()
-            if err:
-                logger.warning("Ark Labs curl stderr: %s", err[:500])
-            if proc.returncode != 0:
-                error_detail = err or f"curl exited {proc.returncode}"
-            else:
-                result = json.loads(out) if out else {}
-                if result.get("error"):
-                    err_obj = result["error"]
-                    error_detail = (
-                        err_obj.get("message") if isinstance(err_obj, dict) else str(err_obj)
-                    )
-                else:
-                    choices = result.get("choices") or []
-                    if choices:
-                        msg = choices[0].get("message") or {}
-                        content = (msg.get("content") or "").strip()
-    except subprocess.TimeoutExpired:
-        error_detail = "Request timed out"
-        logger.warning("Ark Labs curl timed out")
-    except json.JSONDecodeError as e:
-        error_detail = f"Invalid response: {e}"
-        logger.warning("Ark Labs response not JSON", exc_info=True)
-    except FileNotFoundError:
-        error_detail = "curl not found. Install curl or use a system that has it."
-        logger.warning("curl not found")
-    except Exception as e:
-        error_detail = str(e) if e else "Request failed"
-        logger.warning("Ark Labs request failed: %s", error_detail, exc_info=True)
-
-    if error_detail:
-        if not api_key:
-            logger.warning("AI overview: ARK_LABS_API_KEY not set (check webapp/.env and restart runserver)")
-        return JsonResponse({"overview": "", "error": error_detail}, status=503)
-    return JsonResponse({"overview": content or ""})
+    return JsonResponse({"overview": "Yet to be added."})
