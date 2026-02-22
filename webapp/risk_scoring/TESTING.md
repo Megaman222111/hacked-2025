@@ -1,5 +1,8 @@
 # How to test risk scoring (CSV-trained model, DB inference)
 
+For full new-machine setup (backend + frontend + env + model consistency), see:
+`webapp/SETUP_NEW_DEVICE.md`
+
 All commands assume you are in the `webapp` directory.
 
 ## 1. Install dependencies

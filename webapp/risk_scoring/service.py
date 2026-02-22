@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List
@@ -515,7 +516,26 @@ class RiskScoringService:
             import joblib
         except Exception:
             return None
-        for model_path in sorted(model_files, key=lambda p: p.stat().st_mtime, reverse=True):
+        configured_version = str(getattr(settings, "RISK_MODEL_VERSION", "") or "").strip()
+        configured_filename = (
+            f"risk_model_{configured_version}.joblib" if configured_version else ""
+        )
+
+        def _artifact_sort_key(path: Path) -> tuple[int, int, float]:
+            # Prefer higher semantic model generation first (risk-v3 > risk-v2),
+            # then newer timestamp in version suffix, then filesystem mtime.
+            m = re.match(r"risk_model_risk-v(\d+)-(\d+)\.joblib$", path.name)
+            if m:
+                return (int(m.group(1)), int(m.group(2)), float(path.stat().st_mtime))
+            return (0, 0, float(path.stat().st_mtime))
+
+        ordered_files = sorted(model_files, key=_artifact_sort_key, reverse=True)
+        if configured_filename:
+            configured_paths = [p for p in ordered_files if p.name == configured_filename]
+            other_paths = [p for p in ordered_files if p.name != configured_filename]
+            ordered_files = configured_paths + other_paths
+
+        for model_path in ordered_files:
             try:
                 payload = joblib.load(model_path)
                 self._last_load_error = None
