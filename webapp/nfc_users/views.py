@@ -120,6 +120,10 @@ def _patient_api_dict_from_body(body):
         "past_medical_history": _as_string_list(get("pastMedicalHistory", "past_medical_history")),
         "important_test_results": (get("importantTestResults", "important_test_results") or "").strip(),
         "notes": get("notes") if get("notes") is not None else [],
+        "historical_blood_pressure": get("historicalBloodPressure", "historical_blood_pressure") if get("historicalBloodPressure", "historical_blood_pressure") is not None else None,
+        "historical_heart_rate": get("historicalHeartRate", "historical_heart_rate") if get("historicalHeartRate", "historical_heart_rate") is not None else None,
+        "historical_body_weight": get("historicalBodyWeight", "historical_body_weight") if get("historicalBodyWeight", "historical_body_weight") is not None else None,
+        "family_history": get("familyHistory", "family_history") if get("familyHistory", "family_history") is not None else None,
     }
 
 
@@ -239,6 +243,10 @@ def patient_create(request):
             else body.get("important_test_results")
         ) or "",
         notes=body.get("notes") or [],
+        historical_blood_pressure=body.get("historicalBloodPressure") or body.get("historical_blood_pressure") or [],
+        historical_heart_rate=body.get("historicalHeartRate") or body.get("historical_heart_rate") or [],
+        historical_body_weight=body.get("historicalBodyWeight") or body.get("historical_body_weight") or [],
+        family_history=body.get("familyHistory") or body.get("family_history") or [],
     )
     p.save()
     return JsonResponse(p.to_api_dict(), status=201)

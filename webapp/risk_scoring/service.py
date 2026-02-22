@@ -262,81 +262,84 @@ class RiskScoringService:
         risk_band: str,
         feature_row: Dict[str, Any],
     ) -> tuple[float, str, str]:
-        score = float(probability) * 100.0
+        # Scale base to 0–55 so overall scores sit in a lower range
+        base = float(probability) * 55.0
 
-        # Clinical floor: high-risk patients must not get a trivial score (e.g. 1.0)
+        # Clinical floor: high-risk patients must not get a trivial score
         high_risk_allergy = float(feature_row.get("high_risk_allergy_count") or 0.0) >= 1
         high_risk_history = float(feature_row.get("high_risk_history_count") or 0.0) >= 1
         serious_score = float(feature_row.get("serious_condition_score") or 0.0)
         allergy_count = float(feature_row.get("allergy_count") or 0.0)
-        rx_count = float(feature_row.get("current_prescription_count") or 0.0)
-        high_risk_rx = float(feature_row.get("high_risk_prescription_count") or 0.0) >= 1
         history_count = float(feature_row.get("history_count") or 0.0)
         past_count = float(feature_row.get("past_history_count") or 0.0)
         clinical_floor = 1.0
-        if serious_score >= 15 or (high_risk_history and high_risk_rx):
-            clinical_floor = 55.0
-        elif serious_score >= 8 or high_risk_history or (high_risk_allergy and high_risk_rx):
-            clinical_floor = 42.0
-        elif high_risk_allergy or high_risk_rx or allergy_count >= 2 or (history_count >= 4 or past_count >= 2):
+        if serious_score >= 15 or (high_risk_history and float(feature_row.get("high_risk_prescription_count") or 0.0) >= 1):
+            clinical_floor = 38.0
+        elif serious_score >= 8 or high_risk_history or (high_risk_allergy and float(feature_row.get("high_risk_prescription_count") or 0.0) >= 1):
             clinical_floor = 28.0
-        score = max(score, clinical_floor)
+        elif high_risk_allergy or float(feature_row.get("high_risk_prescription_count") or 0.0) >= 1 or allergy_count >= 2 or (history_count >= 4 or past_count >= 2):
+            clinical_floor = 18.0
+        base = max(base, clinical_floor)
 
+        # Context adjustment (capped so scores don’t cluster at the top)
+        adjustment = 0.0
         status = str(feature_row.get("status", "") or "").strip().lower()
         if status == "critical":
-            score += 30.0
+            adjustment += 12.0
         elif status == "discharged":
-            score -= 20.0
+            adjustment -= 12.0
 
         age_for_context = float(
             feature_row.get("age_years_raw") or feature_row.get("age_years") or 0.0
         )
         if age_for_context >= 75:
-            score += 8.0
+            adjustment += 3.0
         raw_days = float(
             feature_row.get("days_since_admission_raw")
             or feature_row.get("days_since_admission")
             or 0.0
         )
         if raw_days >= 14:
-            score += 6.0
+            adjustment += 2.0
         if raw_days >= 60:
-            score += 8.0
+            adjustment += 2.0
         if raw_days >= 180:
-            score += 10.0
+            adjustment += 3.0
         if (feature_row.get("history_count") or 0) >= 4:
-            score += 7.0
+            adjustment += 2.0
         if (feature_row.get("past_history_count") or 0) >= 2:
-            score += 6.0
+            adjustment += 2.0
         if (feature_row.get("allergy_count") or 0) >= 2:
-            score += 4.0
-        score += min(8.0, float(feature_row.get("high_risk_allergy_count") or 0.0) * 6.0)
+            adjustment += 1.0
+        adjustment += min(3.0, float(feature_row.get("high_risk_allergy_count") or 0.0) * 2.0)
         if (feature_row.get("current_prescription_count") or 0) >= 3:
-            score += 5.0
-        score += min(
-            10.0, float(feature_row.get("high_risk_prescription_count") or 0.0) * 7.0
-        )
+            adjustment += 2.0
+        adjustment += min(4.0, float(feature_row.get("high_risk_prescription_count") or 0.0) * 2.0)
         if (feature_row.get("high_risk_history_count") or 0) >= 1:
-            score += 12.0
+            adjustment += 4.0
         if (feature_row.get("medication_count") or 0) == 0:
-            score += 2.0
-        score += min(25.0, float(feature_row.get("serious_condition_score") or 0.0))
+            adjustment += 1.0
+        adjustment += min(8.0, float(feature_row.get("serious_condition_score") or 0.0) * 0.4)
 
-        # Keep seriousness aligned with the model risk band floor.
+        adjustment = max(-12.0, min(18.0, adjustment))
+        score = base + adjustment
+
+        # Align with risk band floor (lower thresholds)
         if risk_band == "high":
-            score = max(score, 70.0)
+            score = max(score, 52.0)
         elif risk_band == "medium":
-            score = max(score, 45.0)
+            score = max(score, 32.0)
 
         score = max(0.0, min(100.0, score))
 
-        if score >= 80.0:
+        # Level thresholds lowered so “critical”/“high” are reserved for clearer cases
+        if score >= 70.0:
             level = "critical"
             recommendation = "Immediate bedside assessment (target: within 15 minutes)."
-        elif score >= 60.0:
+        elif score >= 52.0:
             level = "high"
             recommendation = "Urgent clinician assessment (target: within 30 minutes)."
-        elif score >= 35.0:
+        elif score >= 28.0:
             level = "moderate"
             recommendation = "Priority reassessment and monitoring (target: within 4 hours)."
         else:

@@ -30,6 +30,14 @@ export interface Patient {
   pastMedicalHistory?: string[]
   importantTestResults?: string
   notes: string[]
+  /** Historical BP: { date, systolic, diastolic } */
+  historicalBloodPressure?: { date: string; systolic?: number; diastolic?: number }[]
+  /** Historical HR: { date, bpm } */
+  historicalHeartRate?: { date: string; bpm?: number }[]
+  /** Historical weight: { date, valueKg } or { date, value, unit } */
+  historicalBodyWeight?: { date: string; valueKg?: number; value?: number; unit?: string }[]
+  /** Family history: { condition, relation } */
+  familyHistory?: { condition?: string; relation?: string }[]
 }
 
 import { getAccessToken } from "./auth"
@@ -95,6 +103,53 @@ export interface PatientRiskScore {
   assessmentRecommendation: string
 }
 
+/** Normalize risk score response (camelCase + defaults for seriousness). */
+function normalizePatientRiskScore(raw: Record<string, unknown>): PatientRiskScore {
+  const get = (camel: string, snake: string) =>
+    (raw[camel] ?? raw[snake]) as unknown
+  const band = (get("riskBand", "risk_band") as string) || "low"
+  const prob = Number(get("riskProbability", "risk_probability")) || 0
+  let seriousnessFactor = Number(get("seriousnessFactor", "seriousness_factor"))
+  let seriousnessLevel = String(get("seriousnessLevel", "seriousness_level") || "").toLowerCase()
+  const assessmentRecommendation = (
+    get("assessmentRecommendation", "assessment_recommendation") != null
+      ? String(get("assessmentRecommendation", "assessment_recommendation")).trim()
+      : ""
+  )
+
+  if (Number.isNaN(seriousnessFactor) || seriousnessFactor < 0 || seriousnessFactor > 100) {
+    seriousnessFactor = Math.round(prob * 100 * 10) / 10
+  }
+  if (!["low", "moderate", "high", "critical"].includes(seriousnessLevel)) {
+    if (band === "high") seriousnessLevel = "high"
+    else if (band === "medium") seriousnessLevel = "moderate"
+    else seriousnessLevel = "low"
+  }
+  const fallbackRecommendation =
+    seriousnessLevel === "critical"
+      ? "Immediate bedside assessment (target: within 15 minutes)."
+      : seriousnessLevel === "high"
+        ? "Urgent clinician assessment (target: within 30 minutes)."
+        : seriousnessLevel === "moderate"
+          ? "Priority reassessment and monitoring (target: within 4 hours)."
+          : "Routine monitoring; reassess on any status change."
+
+  return {
+    riskBand: (band as "low" | "medium" | "high") || "low",
+    riskProbability: prob,
+    modelVersion: String(get("modelVersion", "model_version") ?? "unknown"),
+    topFactors: Array.isArray(raw.topFactors)
+      ? raw.topFactors
+      : Array.isArray(raw.top_factors)
+        ? raw.top_factors
+        : [],
+    scoringMode: (get("scoringMode", "scoring_mode") as string) || "heuristic",
+    seriousnessFactor,
+    seriousnessLevel: seriousnessLevel as "low" | "moderate" | "high" | "critical",
+    assessmentRecommendation: assessmentRecommendation || fallbackRecommendation,
+  }
+}
+
 /** Get risk score for a patient (trained model or heuristic). */
 export async function getPatientRiskScore(patientId: string): Promise<PatientRiskScore> {
   const res = await fetch(`${API_BASE_URL}/api/patients/risk-score/`, {
@@ -106,13 +161,13 @@ export async function getPatientRiskScore(patientId: string): Promise<PatientRis
     body: JSON.stringify({ patient_id: patientId }),
     cache: "no-store",
   })
-  const body = await res.json().catch(() => ({}))
+  const body = await res.json().catch(() => ({})) as Record<string, unknown>
   if (!res.ok) {
     const message =
       typeof body.detail === "string" ? body.detail : `Risk score failed (${res.status})`
     throw new Error(message)
   }
-  return body as PatientRiskScore
+  return normalizePatientRiskScore(body)
 }
 
 /** Get AI-generated clinical overview for a patient (Ark Labs). */
@@ -176,6 +231,10 @@ export async function createPatient(data: {
   useAlbertaHealthCard?: boolean
   albertaHealthCardNumber?: string
   notes?: string[]
+  historicalBloodPressure?: { date: string; systolic?: number; diastolic?: number }[]
+  historicalHeartRate?: { date: string; bpm?: number }[]
+  historicalBodyWeight?: { date: string; valueKg?: number; value?: number; unit?: string }[]
+  familyHistory?: { condition?: string; relation?: string }[]
 }): Promise<Patient> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",

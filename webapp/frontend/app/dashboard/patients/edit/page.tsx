@@ -40,6 +40,10 @@ const emptyForm = (nfcId: string): Partial<Patient> => ({
   pastMedicalHistory: [],
   importantTestResults: "",
   notes: [],
+  historicalBloodPressure: [],
+  historicalHeartRate: [],
+  historicalBodyWeight: [],
+  familyHistory: [],
 })
 
 function patientToForm(p: Patient): Partial<Patient> {
@@ -54,6 +58,10 @@ function patientToForm(p: Patient): Partial<Patient> {
     primaryDiagnosis: p.primaryDiagnosis || "",
     importantTestResults: p.importantTestResults || "",
     notes: p.notes || [],
+    historicalBloodPressure: p.historicalBloodPressure ?? [],
+    historicalHeartRate: p.historicalHeartRate ?? [],
+    historicalBodyWeight: p.historicalBodyWeight ?? [],
+    familyHistory: p.familyHistory ?? [],
   }
 }
 
@@ -250,6 +258,10 @@ export default function PatientEditPage() {
           pastMedicalHistory: form.pastMedicalHistory ?? [],
           importantTestResults: form.importantTestResults ?? "",
           notes: form.notes ?? [],
+          historicalBloodPressure: form.historicalBloodPressure ?? [],
+          historicalHeartRate: form.historicalHeartRate ?? [],
+          historicalBodyWeight: form.historicalBodyWeight ?? [],
+          familyHistory: form.familyHistory ?? [],
         })
       } else {
         const created = await createPatient({
@@ -274,6 +286,10 @@ export default function PatientEditPage() {
           pastMedicalHistory: form.pastMedicalHistory?.length ? form.pastMedicalHistory : undefined,
           importantTestResults: form.importantTestResults?.trim() || undefined,
           notes: form.notes?.length ? form.notes : undefined,
+          historicalBloodPressure: form.historicalBloodPressure?.length ? form.historicalBloodPressure : undefined,
+          historicalHeartRate: form.historicalHeartRate?.length ? form.historicalHeartRate : undefined,
+          historicalBodyWeight: form.historicalBodyWeight?.length ? form.historicalBodyWeight : undefined,
+          familyHistory: form.familyHistory?.length ? form.familyHistory : undefined,
         })
         setPendingWriteNfcId(created.nfcId)
         setWriteToTagDone(false)
@@ -631,6 +647,238 @@ export default function PatientEditPage() {
                 }}
               >
                 Add
+              </Button>
+            </div>
+          </div>
+
+          {/* Historical blood pressure */}
+          <div>
+            <Label className="text-muted-foreground">Historical blood pressure (optional)</Label>
+            <p className="mt-1 text-xs text-muted-foreground">Date, systolic, diastolic (mmHg)</p>
+            <div className="mt-2 space-y-2">
+              {(form.historicalBloodPressure ?? []).map((row, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-2 rounded-md border border-input p-2">
+                  <DatePicker
+                    value={row.date ?? ""}
+                    onChange={(v) => {
+                      const list = [...(form.historicalBloodPressure ?? [])]
+                      list[i] = { ...list[i], date: v ?? "" }
+                      updateField("historicalBloodPressure", list)
+                    }}
+                    placeholder="Date"
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Systolic"
+                    value={row.systolic ?? ""}
+                    onChange={(e) => {
+                      const list = [...(form.historicalBloodPressure ?? [])]
+                      list[i] = { ...list[i], systolic: e.target.value === "" ? undefined : Number(e.target.value) }
+                      updateField("historicalBloodPressure", list)
+                    }}
+                    className="w-24"
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Diastolic"
+                    value={row.diastolic ?? ""}
+                    onChange={(e) => {
+                      const list = [...(form.historicalBloodPressure ?? [])]
+                      list[i] = { ...list[i], diastolic: e.target.value === "" ? undefined : Number(e.target.value) }
+                      updateField("historicalBloodPressure", list)
+                    }}
+                    className="w-24"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      updateField(
+                        "historicalBloodPressure",
+                        (form.historicalBloodPressure ?? []).filter((_, j) => j !== i)
+                      )
+                    }
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  updateField("historicalBloodPressure", [...(form.historicalBloodPressure ?? []), { date: "", systolic: undefined, diastolic: undefined }])
+                }
+              >
+                Add blood pressure entry
+              </Button>
+            </div>
+          </div>
+
+          {/* Historical heart rate */}
+          <div>
+            <Label className="text-muted-foreground">Historical heart rate (optional)</Label>
+            <p className="mt-1 text-xs text-muted-foreground">Date and BPM</p>
+            <div className="mt-2 space-y-2">
+              {(form.historicalHeartRate ?? []).map((row, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-2 rounded-md border border-input p-2">
+                  <DatePicker
+                    value={row.date ?? ""}
+                    onChange={(v) => {
+                      const list = [...(form.historicalHeartRate ?? [])]
+                      list[i] = { ...list[i], date: v ?? "" }
+                      updateField("historicalHeartRate", list)
+                    }}
+                    placeholder="Date"
+                  />
+                  <Input
+                    type="number"
+                    placeholder="BPM"
+                    value={row.bpm ?? ""}
+                    onChange={(e) => {
+                      const list = [...(form.historicalHeartRate ?? [])]
+                      list[i] = { ...list[i], bpm: e.target.value === "" ? undefined : Number(e.target.value) }
+                      updateField("historicalHeartRate", list)
+                    }}
+                    className="w-24"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      updateField(
+                        "historicalHeartRate",
+                        (form.historicalHeartRate ?? []).filter((_, j) => j !== i)
+                      )
+                    }
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  updateField("historicalHeartRate", [...(form.historicalHeartRate ?? []), { date: "", bpm: undefined }])
+                }
+              >
+                Add heart rate entry
+              </Button>
+            </div>
+          </div>
+
+          {/* Historical body weight */}
+          <div>
+            <Label className="text-muted-foreground">Historical body weight (optional)</Label>
+            <p className="mt-1 text-xs text-muted-foreground">Date and weight (kg)</p>
+            <div className="mt-2 space-y-2">
+              {(form.historicalBodyWeight ?? []).map((row, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-2 rounded-md border border-input p-2">
+                  <DatePicker
+                    value={row.date ?? ""}
+                    onChange={(v) => {
+                      const list = [...(form.historicalBodyWeight ?? [])]
+                      list[i] = { ...list[i], date: v ?? "" }
+                      updateField("historicalBodyWeight", list)
+                    }}
+                    placeholder="Date"
+                  />
+                  <Input
+                    type="number"
+                    placeholder="Weight (kg)"
+                    value={row.valueKg ?? row.value ?? ""}
+                    onChange={(e) => {
+                      const list = [...(form.historicalBodyWeight ?? [])]
+                      const val = e.target.value === "" ? undefined : Number(e.target.value)
+                      list[i] = { ...list[i], date: list[i].date ?? "", valueKg: val }
+                      updateField("historicalBodyWeight", list)
+                    }}
+                    className="w-28"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      updateField(
+                        "historicalBodyWeight",
+                        (form.historicalBodyWeight ?? []).filter((_, j) => j !== i)
+                      )
+                    }
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  updateField("historicalBodyWeight", [...(form.historicalBodyWeight ?? []), { date: "", valueKg: undefined }])
+                }
+              >
+                Add weight entry
+              </Button>
+            </div>
+          </div>
+
+          {/* Family history */}
+          <div>
+            <Label className="text-muted-foreground">Family history (optional)</Label>
+            <p className="mt-1 text-xs text-muted-foreground">Condition and relation (e.g. Mother, Father)</p>
+            <div className="mt-2 space-y-2">
+              {(form.familyHistory ?? []).map((row, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-2 rounded-md border border-input p-2">
+                  <Input
+                    placeholder="Condition"
+                    value={row.condition ?? ""}
+                    onChange={(e) => {
+                      const list = [...(form.familyHistory ?? [])]
+                      list[i] = { ...list[i], condition: e.target.value }
+                      updateField("familyHistory", list)
+                    }}
+                    className="min-w-[140px]"
+                  />
+                  <Input
+                    placeholder="Relation"
+                    value={row.relation ?? ""}
+                    onChange={(e) => {
+                      const list = [...(form.familyHistory ?? [])]
+                      list[i] = { ...list[i], relation: e.target.value }
+                      updateField("familyHistory", list)
+                    }}
+                    className="min-w-[100px]"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() =>
+                      updateField(
+                        "familyHistory",
+                        (form.familyHistory ?? []).filter((_, j) => j !== i)
+                      )
+                    }
+                  >
+                    Remove
+                  </Button>
+                </div>
+              ))}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  updateField("familyHistory", [...(form.familyHistory ?? []), { condition: "", relation: "" }])
+                }
+              >
+                Add family history entry
               </Button>
             </div>
           </div>

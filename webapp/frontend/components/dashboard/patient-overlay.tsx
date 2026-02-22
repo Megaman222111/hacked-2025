@@ -230,19 +230,19 @@ export function PatientOverlay({
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge
                       variant="outline"
-                      className={`capitalize ${getSeriousnessColor(riskScore.seriousnessLevel)}`}
+                      className={`capitalize ${getSeriousnessColor(riskScore.seriousnessLevel ?? "low")}`}
                     >
-                      {riskScore.seriousnessLevel}
+                      {riskScore.seriousnessLevel ?? "low"}
                     </Badge>
                     <span className="text-sm text-muted-foreground">
-                      {riskScore.seriousnessFactor.toFixed(1)}/100 seriousness
+                      {(riskScore.seriousnessFactor ?? riskScore.riskProbability * 100).toFixed(1)}/100 seriousness
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      ({riskScore.scoringMode})
+                      ({riskScore.scoringMode ?? "heuristic"})
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {riskScore.assessmentRecommendation}
+                    {riskScore.assessmentRecommendation ?? "—"}
                   </p>
                   {(riskScore.topFactors?.length ?? 0) > 0 && (
                     <p className="text-xs text-muted-foreground">

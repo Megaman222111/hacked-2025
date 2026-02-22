@@ -16,10 +16,21 @@ import {
   CreditCard,
   Activity,
   Loader2,
+  Heart,
+  Scale,
+  Users,
 } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
 import type { Patient, PatientRiskScore } from "@/lib/api"
 import { getPatientRiskScore } from "@/lib/api"
 
@@ -70,6 +81,12 @@ function formatDate(dateStr: string) {
     month: "long",
     day: "numeric",
   })
+}
+
+function formatTableDate(dateStr: string) {
+  if (!dateStr) return "—"
+  const d = parseLocalDate(dateStr)
+  return isNaN(d.getTime()) ? dateStr : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
 }
 
 function getAge(dob: string) {
@@ -180,19 +197,19 @@ export function PatientDetail({ patient }: { patient: Patient }) {
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge
                     variant="outline"
-                    className={`capitalize ${getSeriousnessColor(riskScore.seriousnessLevel)}`}
+                    className={`capitalize ${getSeriousnessColor(riskScore.seriousnessLevel ?? "low")}`}
                   >
-                    {riskScore.seriousnessLevel}
+                    {riskScore.seriousnessLevel ?? "low"}
                   </Badge>
                   <span className="text-sm text-muted-foreground">
-                    {riskScore.seriousnessFactor.toFixed(1)}/100 seriousness
+                    {(riskScore.seriousnessFactor ?? riskScore.riskProbability * 100).toFixed(1)}/100 seriousness
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    ({riskScore.scoringMode})
+                    ({riskScore.scoringMode ?? "heuristic"})
                   </span>
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {riskScore.assessmentRecommendation}
+                  {riskScore.assessmentRecommendation ?? "—"}
                 </p>
                 {(riskScore.topFactors?.length ?? 0) > 0 && (
                   <p className="text-xs text-muted-foreground">
@@ -440,6 +457,125 @@ export function PatientDetail({ patient }: { patient: Patient }) {
               </ul>
             </div>
           )}
+
+          {/* Historical blood pressure */}
+          <div className="rounded-xl border border-border bg-card p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold font-[family-name:var(--font-heading)] text-foreground">
+              <Heart className="h-5 w-5 text-primary" />
+              Historical Blood Pressure
+            </h2>
+            {(patient.historicalBloodPressure?.length ?? 0) > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Systolic</TableHead>
+                    <TableHead>Diastolic</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(patient.historicalBloodPressure ?? []).map((row, i) => (
+                    <TableRow key={i}>
+                      <TableCell>{formatTableDate((row as { date?: string }).date ?? "")}</TableCell>
+                      <TableCell>{(row as { systolic?: number }).systolic ?? "—"}</TableCell>
+                      <TableCell>{(row as { diastolic?: number }).diastolic ?? "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground">No blood pressure history recorded</p>
+            )}
+          </div>
+
+          {/* Historical heart rate */}
+          <div className="rounded-xl border border-border bg-card p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold font-[family-name:var(--font-heading)] text-foreground">
+              <Activity className="h-5 w-5 text-primary" />
+              Historical Heart Rate
+            </h2>
+            {(patient.historicalHeartRate?.length ?? 0) > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>BPM</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(patient.historicalHeartRate ?? []).map((row, i) => (
+                    <TableRow key={i}>
+                      <TableCell>{formatTableDate((row as { date?: string }).date ?? "")}</TableCell>
+                      <TableCell>{(row as { bpm?: number }).bpm ?? "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground">No heart rate history recorded</p>
+            )}
+          </div>
+
+          {/* Historical body weight */}
+          <div className="rounded-xl border border-border bg-card p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold font-[family-name:var(--font-heading)] text-foreground">
+              <Scale className="h-5 w-5 text-primary" />
+              Historical Body Weight
+            </h2>
+            {(patient.historicalBodyWeight?.length ?? 0) > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Weight</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(patient.historicalBodyWeight ?? []).map((row, i) => {
+                    const r = row as { date?: string; valueKg?: number; value?: number; unit?: string }
+                    const val = r.valueKg ?? r.value
+                    const unit = r.unit ?? "kg"
+                    return (
+                      <TableRow key={i}>
+                        <TableCell>{formatTableDate(r.date ?? "")}</TableCell>
+                        <TableCell>{val != null ? `${val} ${unit}` : "—"}</TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground">No body weight history recorded</p>
+            )}
+          </div>
+
+          {/* Family history */}
+          <div className="rounded-xl border border-border bg-card p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold font-[family-name:var(--font-heading)] text-foreground">
+              <Users className="h-5 w-5 text-primary" />
+              Family History
+            </h2>
+            {(patient.familyHistory?.length ?? 0) > 0 ? (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Condition</TableHead>
+                    <TableHead>Relation</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(patient.familyHistory ?? []).map((row, i) => (
+                    <TableRow key={i}>
+                      <TableCell>{(row as { condition?: string }).condition ?? "—"}</TableCell>
+                      <TableCell>{(row as { relation?: string }).relation ?? "—"}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            ) : (
+              <p className="text-sm text-muted-foreground">No family history recorded</p>
+            )}
+          </div>
 
           {/* Clinical notes */}
           <div className="rounded-xl border border-border bg-card p-6">

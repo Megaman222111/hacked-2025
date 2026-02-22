@@ -127,6 +127,10 @@ class Patient(models.Model):
     _past_medical_history = models.TextField(blank=True, default="")
     _important_test_results = models.TextField(blank=True, default="")
     _notes = models.TextField(blank=True, default="")
+    _historical_blood_pressure = models.TextField(blank=True, default="")
+    _historical_heart_rate = models.TextField(blank=True, default="")
+    _historical_body_weight = models.TextField(blank=True, default="")
+    _family_history = models.TextField(blank=True, default="")
 
     class Meta:
         ordering = ["id"]
@@ -314,6 +318,38 @@ class Patient(models.Model):
     def notes(self, value):
         self._set_json("_notes", value if isinstance(value, list) else [])
 
+    @property
+    def historical_blood_pressure(self):
+        return self._get_json("_historical_blood_pressure", []) or []
+
+    @historical_blood_pressure.setter
+    def historical_blood_pressure(self, value):
+        self._set_json("_historical_blood_pressure", value if isinstance(value, list) else [])
+
+    @property
+    def historical_heart_rate(self):
+        return self._get_json("_historical_heart_rate", []) or []
+
+    @historical_heart_rate.setter
+    def historical_heart_rate(self, value):
+        self._set_json("_historical_heart_rate", value if isinstance(value, list) else [])
+
+    @property
+    def historical_body_weight(self):
+        return self._get_json("_historical_body_weight", []) or []
+
+    @historical_body_weight.setter
+    def historical_body_weight(self, value):
+        self._set_json("_historical_body_weight", value if isinstance(value, list) else [])
+
+    @property
+    def family_history(self):
+        return self._get_json("_family_history", []) or []
+
+    @family_history.setter
+    def family_history(self, value):
+        self._set_json("_family_history", value if isinstance(value, list) else [])
+
     def to_api_dict(self):
         return {
             "id": self.id,
@@ -339,4 +375,8 @@ class Patient(models.Model):
             "pastMedicalHistory": self.past_medical_history or [],
             "importantTestResults": self.important_test_results or "",
             "notes": self.notes or [],
+            "historicalBloodPressure": self.historical_blood_pressure or [],
+            "historicalHeartRate": self.historical_heart_rate or [],
+            "historicalBodyWeight": self.historical_body_weight or [],
+            "familyHistory": self.family_history or [],
         }
