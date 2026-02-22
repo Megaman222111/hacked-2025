@@ -20,3 +20,6 @@ key.txt
 # OS / editor
 .DS_Store
 .vscode/
+
+#Debugging
+/nfc_webapp/
