@@ -25,3 +25,4 @@ key.txt
 nfc_webapp/
 webapp/SETUP_NEW_DEVICE.md
 webapp/risk_scoring/TESTING.md
+webapp/E2E_VERIFICATION.md
