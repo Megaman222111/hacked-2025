@@ -22,4 +22,4 @@ key.txt
 .vscode/
 
 #Debugging
-/nfc_webapp/
+nfc_webapp/
